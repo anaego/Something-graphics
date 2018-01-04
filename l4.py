@@ -1,39 +1,99 @@
+import math
+import json
+import numpy as np
 import sdl2
 import sdl2.ext as sdl2e
 
 
-ROTATE_STEP = 0.1
+WIDTH = 800
+HEIGHT = 600
 
 
-class World(object):
-    def __init__(self):
-        self.camera_rho = 10
-        self.camera_theta = 0
-        self.camera_phi = 0
-        self.x_a = 0
-        self.y_a = 0
-        self.z_a = 0
-
-    def handle_key(self, ks):
-        if ks == sdl2.SDLK_m:
-            print(self)
-        elif ks == sdl2.SDLK_a:
-            self.x_a -= ROTATE_STEP
-        elif ks == sdl2.SDLK_d:
-            self.y_a += ROTATE_STEP
-
-    def __str__(self):
-        return ("CAMERA\t\t𝛒: {0}, Θ: {1}, 𝜑: {2}\n"
-                "ROTATE\t\tx: {3}, y: {4}, z: {5}\n").format(
-                    self.camera_rho, self.camera_theta, self.camera_phi,
-                    self.x_a, self.y_a, self.z_a)
+def zoom(z):
+    return np.array([[z, 0, 0, 0],
+                     [0, z, 0, 0],
+                     [0, 0, z, 0],
+                     [0, 0, 0, 1]])
 
 
-world = World()
+def perspective_projection(rho, phi, theta):
+    z = rho * math.cos(phi)
+    cp = math.cos(phi)
+    sp = math.sin(phi)
+    ct = math.cos(theta)
+    st = math.sin(theta)
+    return np.array([[cp, sp * st,  0, (sp * ct) / z],
+                     [0,  ct,       0, -st / z],
+                     [sp, -cp * st, 0, -(cp * ct) / z],
+                     [0,  0,        0, 1]])
+
+
+def draw(window):
+    surface = window.get_surface()
+    sdl2e.fill(surface, sdl2e.string_to_color("#ffffff"))
+
+    points = figure["points"]
+    points = np.dot(points, zoom(20))
+    points = np.dot(points, perspective_projection(world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"]))
+    points = points / points[:, -1].reshape((points.shape[0], 1))
+    points += [WIDTH / 2, HEIGHT / 2, 0, 0]
+
+    for polygon in figure["polygons"]:
+        n = len(polygon["points"])
+        ppoints = list(map(lambda p: points[p], polygon["points"]))
+        edges = map(lambda pi: (ppoints[pi], ppoints[(pi + 1) % n]), range(n))
+        for edge, m in zip(edges, polygon["mask"]):
+            if m == 0:
+                continue
+            try:
+                # fails on out-of-view lines
+                sdl2e.line(surface, sdl2e.string_to_color("#000000"), (edge[0][0], edge[0][1], edge[1][0], edge[1][1]))
+            except:
+                pass
+
+    window.refresh()
+
+
+def handle_key(window, ks):
+    if ks == sdl2.SDLK_m:
+        print(json.dumps(world, indent=2))
+    elif ks == sdl2.SDLK_UP:
+        world["camera"]["theta"] -= 0.05
+    elif ks == sdl2.SDLK_DOWN:
+        world["camera"]["theta"] += 0.05
+    elif ks == sdl2.SDLK_LEFT:
+        world["camera"]["phi"] -= 0.05
+    elif ks == sdl2.SDLK_RIGHT:
+        world["camera"]["phi"] += 0.05
+    else:
+        return
+    draw(window)
+
+
+world = {
+    "camera": {
+        "rho": 450.0,
+        "phi": 0.0,
+        "theta": 0.0
+    },
+    "rotate": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    }
+}
+
+with open("figure.json", "r") as ff:
+    figure = json.loads(ff.read())
+
+figure["points"] = np.array(figure["points"])
+figure["points"] -= np.mean(figure["points"], axis=0)
+figure["points"] = np.hstack((figure["points"], np.ones((figure["points"].shape[0], 1))))
 
 sdl2e.init()
-window = sdl2e.Window("Anal Penetration", size=(800, 600))
+window = sdl2e.Window("...", size=(WIDTH, HEIGHT))
 window.show()
+draw(window)
 
 running = True
 while running:
@@ -43,7 +103,6 @@ while running:
             running = False
             break
         if event.type == sdl2.SDL_KEYDOWN:
-            world.handle_key(event.key.keysym.sym)
-    window.refresh()
+            handle_key(window, event.key.keysym.sym)
 
 sdl2e.quit()
