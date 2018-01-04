@@ -9,36 +9,42 @@ WIDTH = 800
 HEIGHT = 600
 
 
-def zoom(z):
-    return np.array([[z, 0, 0, 0],
-                     [0, z, 0, 0],
-                     [0, 0, z, 0],
-                     [0, 0, 0, 1]])
+def zoom(points, z):
+    m = np.array([[z, 0, 0, 0],
+                  [0, z, 0, 0],
+                  [0, 0, z, 0],
+                  [0, 0, 0, 1]])
+    return np.dot(points, m)
 
 
-def perspective_projection(rho, phi, theta):
+# FIXME: replace w/ proper projection
+def project(points, rho, phi, theta, d):
     z = rho * math.cos(phi)
     cp = math.cos(phi)
     sp = math.sin(phi)
     ct = math.cos(theta)
     st = math.sin(theta)
-    return np.array([[cp, sp * st,  0, (sp * ct) / z],
-                     [0,  ct,       0, -st / z],
-                     [sp, -cp * st, 0, -(cp * ct) / z],
-                     [0,  0,        0, 1]])
+    m = np.array([[cp, sp * st,  0, (sp * ct) / z],
+                  [0,  ct,       0, -st / z],
+                  [sp, -cp * st, 0, -(cp * ct) / z],
+                  [0,  0,        0, 1]])
+    points = np.dot(points, m)
+    points = points / points[:, -1].reshape((points.shape[0], 1))
+    points += [WIDTH / 2, HEIGHT / 2, 0, 0]
+    return points
 
 
-def draw(window):
+def transform(world, points):
+    points = zoom(points, 50) # FIXME: temporary, before proper proj is ready
+    points = project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
+    return points
+
+
+def draw(window, points, polygons):
     surface = window.get_surface()
     sdl2e.fill(surface, sdl2e.string_to_color("#ffffff"))
 
-    points = figure["points"]
-    points = np.dot(points, zoom(20))
-    points = np.dot(points, perspective_projection(world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"]))
-    points = points / points[:, -1].reshape((points.shape[0], 1))
-    points += [WIDTH / 2, HEIGHT / 2, 0, 0]
-
-    for polygon in figure["polygons"]:
+    for polygon in polygons:
         n = len(polygon["points"])
         ppoints = list(map(lambda p: points[p], polygon["points"]))
         edges = map(lambda pi: (ppoints[pi], ppoints[(pi + 1) % n]), range(n))
@@ -46,7 +52,7 @@ def draw(window):
             if m == 0:
                 continue
             try:
-                # fails on out-of-view lines
+                # FIXME: fails on out-of-view lines, should do custom z-order canvas draws anyway
                 sdl2e.line(surface, sdl2e.string_to_color("#000000"), (edge[0][0], edge[0][1], edge[1][0], edge[1][1]))
             except:
                 pass
@@ -66,13 +72,15 @@ def handle_key(window, ks):
     elif ks == sdl2.SDLK_RIGHT:
         world["camera"]["phi"] += 0.05
     else:
-        return
-    draw(window)
+        return False
+
+    return True
 
 
 world = {
+    "d": 100.0,
     "camera": {
-        "rho": 450.0,
+        "rho": 400.0,
         "phi": 0.0,
         "theta": 0.0
     },
@@ -93,7 +101,7 @@ figure["points"] = np.hstack((figure["points"], np.ones((figure["points"].shape[
 sdl2e.init()
 window = sdl2e.Window("...", size=(WIDTH, HEIGHT))
 window.show()
-draw(window)
+draw(window, transform(world, figure["points"]), figure["polygons"])
 
 running = True
 while running:
@@ -103,6 +111,7 @@ while running:
             running = False
             break
         if event.type == sdl2.SDL_KEYDOWN:
-            handle_key(window, event.key.keysym.sym)
+            if handle_key(window, event.key.keysym.sym):
+                draw(window, transform(world, figure["points"]), figure["polygons"])
 
 sdl2e.quit()
