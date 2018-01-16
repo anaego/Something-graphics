@@ -90,15 +90,15 @@ def project(points, rho, phi, theta, d):
                   [0, 0, 0, 1]])
     points = np.dot(m, points.T).T
     points = points / points[:, -1].reshape((points.shape[0], 1))
-    points += [WIDTH / 2, HEIGHT / 2, 0, 0]
+    #points += [WIDTH / 2, HEIGHT / 2, 0, 0]
     return points
 
 
 def true_project(points, rho, phi, theta, d):
     n = 1
-    f = 100000
+    f = 100
     aspect = WIDTH / HEIGHT
-    fov = 1.5708
+    fov = 0.02
     # helpers
     ctg = 1 / math.tan(fov / 2)
     nct = ctg / aspect
@@ -113,13 +113,14 @@ def true_project(points, rho, phi, theta, d):
 
 
 def transform(world, points):
-    points = zoom(points, 50)  # FIXME: temporary, before proper proj is ready
+    #points = zoom(points, 50)  # FIXME: temporary, before proper proj is ready
     points = rotate_x(points, world["rotate"]["x"])
     points = rotate_y(points, world["rotate"]["y"])
     points = rotate_z(points, world["rotate"]["z"])
     points = axis_rotate(points, figure["AB"], world["rotate"]["AB"])
-    points = project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
+    #points = project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
     points = true_project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
+    points += [WIDTH / 2, HEIGHT / 2, 0, 0]
     return points
 
 
