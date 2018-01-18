@@ -98,7 +98,7 @@ def true_project(points, rho, phi, theta, d):
     n = 1
     f = 100
     aspect = WIDTH / HEIGHT
-    fov = 0.02
+    fov = 0.04
     # helpers
     ctg = 1 / math.tan(fov / 2)
     nct = ctg / aspect
@@ -111,6 +111,10 @@ def true_project(points, rho, phi, theta, d):
                   [0, 0, nfn, 0]])
     return np.dot(m, points.T).T
 
+def shift(points, rho, phi, theta):
+    points += [phi, theta, 0, 0]
+    return points
+
 
 def transform(world, points):
     #points = zoom(points, 50)  # FIXME: temporary, before proper proj is ready
@@ -118,8 +122,9 @@ def transform(world, points):
     points = rotate_y(points, world["rotate"]["y"])
     points = rotate_z(points, world["rotate"]["z"])
     points = axis_rotate(points, figure["AB"], world["rotate"]["AB"])
+    points = shift(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"])
     #points = project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
-    points = true_project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
+    #points = true_project(points, world["camera"]["rho"], world["camera"]["phi"], world["camera"]["theta"], world["d"])
     points += [WIDTH / 2, HEIGHT / 2, 0, 0]
     return points
 
@@ -177,7 +182,7 @@ def handle_key(window, ks):
 world = {
     "d": 100.0,
     "camera": {
-        "rho": 400.0,
+        "rho": 0.0,
         "phi": 0.0,
         "theta": 0.0
     },
